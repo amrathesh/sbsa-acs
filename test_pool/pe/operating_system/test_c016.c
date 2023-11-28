@@ -35,6 +35,8 @@ static void payload(void)
     uint32_t test_run = 0;
     uint32_t ris_supported = 0;
     uint32_t cpor_supported = 0;
+    uint32_t pe_prox_domain;
+    uint32_t cache_level;
 
     if (g_sbsa_level < 5) {
         val_set_status(index, RESULT_SKIP(g_sbsa_level, TEST_NUM, 01));
@@ -120,9 +122,64 @@ static void payload(void)
     if (!test_run) {
         val_print(AVS_PRINT_ERR, "\n       No LLC MSC found", 0);
         val_set_status(index, RESULT_FAIL(g_sbsa_level, TEST_NUM, 05));
-        return;
+        //return;
     } else if (!cpor_supported) {
         val_print(AVS_PRINT_ERR, "\n       CPOR unsupported by LLC", 0);
+        val_set_status(index, RESULT_FAIL(g_sbsa_level, TEST_NUM, 04));
+        //return;
+    }
+
+// test mem-side cache for cpor
+    val_print(AVS_PRINT_DEBUG, "\n Testing mem-side caches for CPOR support", 0);
+    cpor_supported = 0;
+    test_run = 0;
+    pe_prox_domain = val_srat_get_info(SRAT_GICC_PROX_DOMAIN, val_pe_get_uid(index));
+    /* visit each MSC node and check for mem cache resources */
+    for (msc_index = 0; msc_index < msc_node_cnt; msc_index++) {
+        rsrc_node_cnt = val_mpam_get_info(MPAM_MSC_RSRC_COUNT, msc_index, 0);
+
+        val_print(AVS_PRINT_DEBUG, "\n       msc index  = %d", msc_index);
+        val_print(AVS_PRINT_DEBUG, "\n       Resource count = %d", rsrc_node_cnt);
+
+        ris_supported = val_mpam_msc_supports_ris(msc_index);
+        val_print(AVS_PRINT_INFO, "\n       RIS Support = %d", ris_supported);
+
+        for (rsrc_index = 0; rsrc_index < rsrc_node_cnt; rsrc_index++) {
+
+            /* check whether the resource location is cache */
+            if (val_mpam_get_info(MPAM_MSC_RSRC_TYPE, msc_index, rsrc_index) ==
+                                                                       MPAM_RSRC_TYPE_MEM_SIDE_CACHE) {
+                if (val_mpam_get_info(MPAM_MSC_RSRC_DESC2, msc_index, rsrc_index)
+                                                               == pe_prox_domain) {
+                    /* We have MSC which controls/monitors the LLC cache */
+                    val_print(AVS_PRINT_DEBUG, "\n       rsrc index  = %d", rsrc_index);
+                    cache_level = val_mpam_get_info(MPAM_MSC_RSRC_DESC1, msc_index, rsrc_index) & 0xFF;
+                    val_print(AVS_PRINT_DEBUG, "\n       mem-side cache level  = %d", cache_level);
+                    test_run = 1;
+
+                    /* Select resource instance if RIS feature implemented */
+                    if (ris_supported)
+                        val_mpam_memory_configure_ris_sel(msc_index, rsrc_index);
+
+                    /* Check CPOR are present */
+                    if (val_mpam_supports_cpor(msc_index)) {
+                        val_print(AVS_PRINT_DEBUG,
+                                  "\n       CPOR Supported by mem-side cache with rsrc_index %d", rsrc_index);
+                        cpor_supported |= 1;
+                    }
+                    val_print(AVS_PRINT_DEBUG,
+                              "\n       CPOR Not Supported by mem-side cache with rsrc_index %d", rsrc_index);
+                }
+            }
+        }
+    }
+
+    if (!test_run) {
+        val_print(AVS_PRINT_ERR, "\n       No memside cache MSC found", 0);
+        val_set_status(index, RESULT_FAIL(g_sbsa_level, TEST_NUM, 05));
+        return;
+    } else if (!cpor_supported) {
+        val_print(AVS_PRINT_ERR, "\n       CPOR unsupported by memside caches", 0);
         val_set_status(index, RESULT_FAIL(g_sbsa_level, TEST_NUM, 04));
         return;
     }
