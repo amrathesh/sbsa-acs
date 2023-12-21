@@ -37,6 +37,7 @@ static void payload(void)
     uint32_t cpor_supported = 0;
     uint32_t pe_prox_domain;
     uint32_t cache_level;
+    uint64_t mpam_rsrc_type;
 
     if (g_sbsa_level < 5) {
         val_set_status(index, RESULT_SKIP(g_sbsa_level, TEST_NUM, 01));
@@ -134,6 +135,7 @@ static void payload(void)
     cpor_supported = 0;
     test_run = 0;
     pe_prox_domain = val_srat_get_info(SRAT_GICC_PROX_DOMAIN, val_pe_get_uid(index));
+    val_print(AVS_PRINT_DEBUG, "\n       PE Proximity domain  = %x", pe_prox_domain);
     /* visit each MSC node and check for mem cache resources */
     for (msc_index = 0; msc_index < msc_node_cnt; msc_index++) {
         rsrc_node_cnt = val_mpam_get_info(MPAM_MSC_RSRC_COUNT, msc_index, 0);
@@ -145,12 +147,11 @@ static void payload(void)
         val_print(AVS_PRINT_INFO, "\n       RIS Support = %d", ris_supported);
 
         for (rsrc_index = 0; rsrc_index < rsrc_node_cnt; rsrc_index++) {
-
+            val_print(AVS_PRINT_DEBUG, "\n       rsrc index  = %d", rsrc_index);
+            mpam_rsrc_type = val_mpam_get_info(MPAM_MSC_RSRC_TYPE, msc_index, rsrc_index);
+            val_print(AVS_PRINT_INFO, "\n       MPAM rsrc type = %lx", ris_supported);
             /* check whether the resource location is cache */
-            if (val_mpam_get_info(MPAM_MSC_RSRC_TYPE, msc_index, rsrc_index) ==
-                                                                       MPAM_RSRC_TYPE_MEM_SIDE_CACHE) {
-                if (val_mpam_get_info(MPAM_MSC_RSRC_DESC2, msc_index, rsrc_index)
-                                                               == pe_prox_domain) {
+            if (mpam_rsrc_type == MPAM_RSRC_TYPE_MEM_SIDE_CACHE) {
                     /* We have MSC which controls/monitors the LLC cache */
                     val_print(AVS_PRINT_DEBUG, "\n       rsrc index  = %d", rsrc_index);
                     cache_level = val_mpam_get_info(MPAM_MSC_RSRC_DESC1, msc_index, rsrc_index) & 0xFF;
@@ -169,7 +170,6 @@ static void payload(void)
                     }
                     val_print(AVS_PRINT_DEBUG,
                               "\n       CPOR Not Supported by mem-side cache with rsrc_index %d", rsrc_index);
-                }
             }
         }
     }

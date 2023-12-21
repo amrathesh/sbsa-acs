@@ -65,6 +65,8 @@ pal_mpam_dump_table(MPAM_INFO_TABLE *MpamTable)
                             curr_entry->rsrc_node[j].locator_type);
           sbsa_print(AVS_PRINT_INFO, L"\ndescriptor1     :%llx ",
                              curr_entry->rsrc_node[j].descriptor1);
+          sbsa_print(AVS_PRINT_INFO, L"\ndescriptor2     :%lx ",
+                             curr_entry->rsrc_node[j].descriptor2);
       }
       curr_entry = MPAM_NEXT_MSC(curr_entry);
   }
